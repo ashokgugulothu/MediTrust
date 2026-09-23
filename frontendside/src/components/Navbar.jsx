@@ -37,7 +37,7 @@ const Navbar = () => {
           <hr className='border-none outline-none h-0.5 bg-primary w-3/5 m-auto hidden' />
         </NavLink>
         <a
-          href="http://localhost:4000/"
+          href="http://localhost:5174"
           target="_blank"
           rel="noopener noreferrer"
           className="bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold px-6 py-2 rounded-full shadow-md transition-all hover:scale-105 hover:shadow-lg hover:bg-[#c25106] hover:text-black "

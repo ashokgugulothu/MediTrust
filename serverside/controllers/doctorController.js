@@ -31,6 +31,77 @@ const loginDoctor = async (req, res) => {
     }
 }
 
+// API to send Doctor Password Reset OTP (Testing Mode - prints to terminal)
+const sendDoctorPasswordResetOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const doctor = await doctorModel.findOne({ email });
+
+        if (!doctor) {
+            return res.json({ success: false, message: "Doctor not found" });
+        }
+
+        // Generate 6-digit OTP
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
+        const otpExpiry = Date.now() + 15 * 60 * 1000; // Valid for 15 mins
+
+        doctor.resetOtp = otp;
+        doctor.resetOtpExpire = otpExpiry;
+        await doctor.save();
+
+        // Console log for testing mode
+        console.log(`========================================`);
+        console.log(`[TEST MODE] Doctor Password Reset OTP for ${email}: ${otp}`);
+        console.log(`========================================`);
+
+        res.json({ success: true, message: "OTP sent! Check your backend terminal console." });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// API to Verify OTP and Reset Doctor Password
+const resetDoctorPassword = async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+
+        if (!email || !otp || !newPassword) {
+            return res.json({ success: false, message: "Missing details" });
+        }
+
+        const doctor = await doctorModel.findOne({ email });
+        if (!doctor) {
+            return res.json({ success: false, message: "Doctor not found" });
+        }
+
+        if (doctor.resetOtp === "" || doctor.resetOtp !== otp) {
+            return res.json({ success: false, message: "Invalid OTP" });
+        }
+
+        if (doctor.resetOtpExpire < Date.now()) {
+            return res.json({ success: false, message: "OTP Expired" });
+        }
+
+        if (newPassword.length < 8) {
+            return res.json({ success: false, message: "Please enter a strong password (min 8 characters)" });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        doctor.password = hashedPassword;
+        doctor.resetOtp = "";
+        doctor.resetOtpExpire = 0;
+        await doctor.save();
+
+        res.json({ success: true, message: "Doctor password reset successfully!" });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
 // API to get doctor appointments for doctor panel
 const appointmentsDoctor = async (req, res) => {
     try {
@@ -173,8 +244,6 @@ const doctorDashboard = async (req, res) => {
             }
         })
 
-
-
         const dashData = {
             earnings,
             appointments: appointments.length,
@@ -192,6 +261,8 @@ const doctorDashboard = async (req, res) => {
 
 export {
     loginDoctor,
+    sendDoctorPasswordResetOtp,
+    resetDoctorPassword,
     appointmentsDoctor,
     appointmentCancel,
     doctorList,

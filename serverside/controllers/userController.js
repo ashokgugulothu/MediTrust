@@ -37,7 +37,7 @@ const registerUser = async (req, res) => {
         }
 
         // hashing user password
-        const salt = await bcrypt.genSalt(10); // the more no. round the more time it will take
+        const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt)
 
         const userData = {
@@ -83,6 +83,78 @@ const loginUser = async (req, res) => {
         res.json({ success: false, message: error.message })
     }
 }
+
+// API to send Password Reset OTP (Testing Mode - prints to terminal)
+const sendPasswordResetOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await userModel.findOne({ email });
+
+        if (!user) {
+            return res.json({ success: false, message: "User not found" });
+        }
+
+        // Generate 6-digit OTP
+        const otp = String(Math.floor(100000 + Math.random() * 900000));
+        const otpExpiry = Date.now() + 15 * 60 * 1000; // Valid for 15 mins
+
+        user.resetOtp = otp;
+        user.resetOtpExpire = otpExpiry;
+        await user.save();
+
+        // Console log for testing mode
+        console.log(`========================================`);
+        console.log(`[TEST MODE] Password Reset OTP for ${email}: ${otp}`);
+        console.log(`========================================`);
+
+        res.json({ success: true, message: "OTP sent! Check your backend terminal console." });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// API to Verify OTP and Reset Password
+const resetPassword = async (req, res) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+
+        if (!email || !otp || !newPassword) {
+            return res.json({ success: false, message: "Missing details" });
+        }
+
+        const user = await userModel.findOne({ email });
+        if (!user) {
+            return res.json({ success: false, message: "User not found" });
+        }
+
+        if (user.resetOtp === "" || user.resetOtp !== otp) {
+            return res.json({ success: false, message: "Invalid OTP" });
+        }
+
+        if (user.resetOtpExpire < Date.now()) {
+            return res.json({ success: false, message: "OTP Expired" });
+        }
+
+        // validating strong new password
+        if (newPassword.length < 8) {
+            return res.json({ success: false, message: "Please enter a strong password (min 8 characters)" });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        user.password = hashedPassword;
+        user.resetOtp = "";
+        user.resetOtpExpire = 0;
+        await user.save();
+
+        res.json({ success: true, message: "Password reset successfully!" });
+    } catch (error) {
+        console.log(error);
+        res.json({ success: false, message: error.message });
+    }
+};
 
 // API to get user profile data
 const getProfile = async (req, res) => {
@@ -235,7 +307,7 @@ const listAppointment = async (req, res) => {
     }
 }
 
-// // API to make payment of appointment using razorpay
+// API to make payment of appointment using razorpay
 const paymentRazorpay = async (req, res) => {
     try {
 
@@ -346,6 +418,8 @@ const verifyStripe = async (req, res) => {
 export {
     loginUser,
     registerUser,
+    sendPasswordResetOtp,
+    resetPassword,
     getProfile,
     updateProfile,
     bookAppointment,
